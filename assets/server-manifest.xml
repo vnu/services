@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
     <edu.buffalo.cse.phonelab.manifest.ManifestService>
-        <test>Testing manifest parsing.</test>
+        <downloadRate>60</downloadRate>
     </edu.buffalo.cse.phonelab.manifest.ManifestService>
 </manifest>

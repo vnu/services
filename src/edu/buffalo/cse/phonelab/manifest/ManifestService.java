@@ -6,12 +6,16 @@ import java.io.StringWriter;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerConfigurationException;
 import javax.xml.transform.TransformerFactory;
+import javax.xml.transform.TransformerFactoryConfigurationError;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import javax.xml.xpath.XPath;
@@ -28,6 +32,10 @@ import android.content.res.AssetManager;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
+import org.simpleframework.xml.Element;
+import org.simpleframework.xml.Root;
+import org.simpleframework.xml.Serializer;
+import org.simpleframework.xml.core.Persister;
 
 public class ManifestService extends Service implements ManifestInterface {
 	
@@ -40,6 +48,10 @@ public class ManifestService extends Service implements ManifestInterface {
 	private DocumentBuilderFactory manifestBuilderFactory;
 	private DocumentBuilder manifestBuilder;
 	private Document manifestDocument;
+	
+	private ScheduledThreadPoolExecutor downloadManifestExecutor;
+	
+	private ManifestParameters manifestParameters;
 	
 	public class ManifestBinder extends Binder {
 		ManifestService getService() {
@@ -67,11 +79,22 @@ public class ManifestService extends Service implements ManifestInterface {
 			Log.d("ManifestService", "Failed to start." + e);
 			return START_NOT_STICKY;
 		}
+		downloadManifestExecutor = new ScheduledThreadPoolExecutor(1);
+		DownloadManifestTask task = new DownloadManifestTask();
+		downloadManifestExecutor.scheduleAtFixedRate(task, 0L, 10L, TimeUnit.SECONDS);
+		
 		Log.i("ManifestService", "Started.");
 		return START_STICKY;
 	}
 	
-	private void reloadManifest() throws SAXException, IOException, NoSuchAlgorithmException {
+	private class DownloadManifestTask implements Runnable {
+		@Override
+		public void run() {
+			return;
+		}
+		
+	}
+	private void reloadManifest() throws SAXException, IOException, NoSuchAlgorithmException, TransformerConfigurationException, TransformerFactoryConfigurationError {
 		BufferedInputStream manifestInputStream = new BufferedInputStream(assetManager.open("server-manifest.xml", AssetManager.ACCESS_BUFFER));
 		
 		MessageDigest manifestDigest = MessageDigest.getInstance("MD5");
@@ -91,12 +114,19 @@ public class ManifestService extends Service implements ManifestInterface {
 	
 		XPath manifestXPath = XPathFactory.newInstance().newXPath();
 		
+		Transformer transformer = TransformerFactory.newInstance().newTransformer();
+		transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
+		
 		for (HashMap.Entry<String, ManifestInterface> entry : receiverHash.entrySet()) {
 			Log.i("ManifestService", "Looking for " + entry.getKey() + " in receive hash.");
 			String classNamePattern = "/manifest/" + entry.getKey();
 			try {
 				Node classNameNode = (Node) manifestXPath.evaluate(classNamePattern, manifestDocument, XPathConstants.NODE);
-				entry.getValue().remoteUpdate(classNameNode);
+				DOMSource domSource = new DOMSource(classNameNode);
+				StringWriter writer = new StringWriter();
+				StreamResult result = new StreamResult(writer);
+				transformer.transform(domSource, result);
+				entry.getValue().remoteUpdate(writer.toString());
 			} catch (Exception e) {
 				Log.d("ManifestReceiver", e.toString());
 				continue;
@@ -112,25 +142,23 @@ public class ManifestService extends Service implements ManifestInterface {
 	public void discardManifestUpdates(ManifestInterface receiver) {
 		receiverHash.remove(receiver.getClass().getName());
 	}
-
+	
 	@Override
-	public void remoteUpdate(Node manifestNode) {
-		Log.i("ManifestService", "remoteUpdate called.");
-		DOMSource domSource = new DOMSource(manifestNode);
-		StringWriter writer = new StringWriter();
-		StreamResult result = new StreamResult(writer);
-		Transformer transformer;
+	public void remoteUpdate(String manifestString) {
+		Log.i("ManifestService", "manifestString" + manifestString);
+		Serializer parameterDeserializer = new Persister();
+		ManifestParameters newParameters;
 		try {
-			transformer = TransformerFactory.newInstance().newTransformer();
-			transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, "yes");
-			transformer.transform(domSource, result);
-			Log.i("ManifestService", writer.toString());
+			newParameters = parameterDeserializer.read(ManifestParameters.class, manifestString);
 		} catch (Exception e) {
+			Log.d("ManifestService", e.toString());
+			return;
 		}
+		Log.i("ManifestService", newParameters.downloadRate.toString());
 	}
 
 	@Override
-	public Node localUpdate() {
+	public String localUpdate() {
 		// TODO Auto-generated method stub
 		return null;
 	}

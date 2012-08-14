@@ -160,7 +160,7 @@ public class ManifestService extends Service implements ManifestInterface {
 		reloadManifest(false);
 	}
 	
-	private synchronized void reloadManifest(boolean ignoreFileSimilarity) throws SAXException, NoSuchAlgorithmException, TransformerConfigurationException, TransformerFactoryConfigurationError, IOException {
+	private synchronized void reloadManifest(boolean ignoreFileSimilarity) throws NoSuchAlgorithmException, TransformerConfigurationException, TransformerFactoryConfigurationError, IOException {
 
 		
 		MessageDigest downloadManifestDigester = MessageDigest.getInstance("MD5");
@@ -196,6 +196,9 @@ public class ManifestService extends Service implements ManifestInterface {
 		if (ignoreFileSimilarity) {
 			manifestChanged = true;
 			Log.i(manifestParameters.logTag, "ignoreFileSimilarity forced manifest update.");
+		} else if (!(manifestParameters.compareFiles)) {
+			manifestChanged = true;
+			Log.i(manifestParameters.logTag, "Updates forced regardless of file similarity.");
 		} else if (downloadManifestDigest != null) {
 			if (!(MessageDigest.isEqual(serverManifestDigest, downloadManifestDigest))) {
 				manifestChanged = true;
@@ -205,9 +208,15 @@ public class ManifestService extends Service implements ManifestInterface {
 		}
 		
 		if (manifestChanged) {
-			BufferedInputStream manifestInputStream = new BufferedInputStream(new FileInputStream(serverManifestFile));
-			manifestDocument = manifestBuilder.parse(manifestInputStream);
 			Log.i(manifestParameters.logTag, "Manifest has changed or updating was forced.");
+			BufferedInputStream manifestInputStream = new BufferedInputStream(new FileInputStream(serverManifestFile));
+			try {
+				manifestDocument = manifestBuilder.parse(manifestInputStream);
+			} catch (SAXException e) {
+				Log.d(manifestParameters.logTag, "Unable to parse manifest. Not loading new parameters.");
+				return;
+			}
+			
 		} else {
 			Log.i(manifestParameters.logTag, "Manifest is unchanged.");
 			return;
@@ -293,6 +302,7 @@ public class ManifestService extends Service implements ManifestInterface {
 			return;
 		}
 		if (!(manifestParameters.equals(newParameters))) {
+			Log.i(manifestParameters.logTag, "Manifest parameters have changed. Updating.");
 			updateParameters(newParameters);
 		} else {
 			Log.i(manifestParameters.logTag, "Manifest parameters for ManifestService are unchanged.");

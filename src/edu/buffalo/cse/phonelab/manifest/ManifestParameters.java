@@ -44,11 +44,11 @@ public class ManifestParameters {
 		}
 		ManifestParameters lhs = (ManifestParameters) o;
 		
-		return updateRate == lhs.updateRate &&
-				logTag == lhs.logTag &&
+		return updateRate != null && updateRate.equals(lhs.updateRate) &&
+				logTag != null && logTag.equals(lhs.logTag) &&
 				compareFiles == lhs.compareFiles &&
 				compareNodes == lhs.compareNodes &&
-				manifestURL == lhs.manifestURL;
+				manifestURL != null && manifestURL.equals(lhs.manifestURL);
 				
 	}
 }

@@ -150,8 +150,7 @@ public class ManifestService extends Service implements ManifestInterface {
 			try {
 				reloadManifest();
 			} catch (Exception e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
+				Log.d(manifestParameters.logTag, "reloadManifest() failed " + e.toString());
 			}
 		}
 	}

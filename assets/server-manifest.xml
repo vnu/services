@@ -1,6 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <manifest>
     <edu.buffalo.cse.phonelab.manifest.ManifestService>
-        <downloadRate>60</downloadRate>
+        
+        <logTag>ManifestService</logTag>
+        <updateRate>30</updateRate>
+        <compareFiles>True</compareFiles>
+        <compareNodes>True</compareNodes>
+        
+        <manifestURL>http://blue.cse.buffalo.edu/manifest/</manifestURL>
     </edu.buffalo.cse.phonelab.manifest.ManifestService>
 </manifest>

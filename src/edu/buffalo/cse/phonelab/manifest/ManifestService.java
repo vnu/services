@@ -357,7 +357,33 @@ public class ManifestService extends Service implements ManifestInterface {
 			for (RunningServiceInfo runningServiceInfo : activityManager.getRunningServices(Integer.MAX_VALUE)) {
 				runningServices.add(runningServiceInfo.service.getClassName());
 			}
+			
+			Iterator<String> startingServicesIterator = startingServices.iterator();
+			while (startingServicesIterator.hasNext()) {
+				String startingService = startingServicesIterator.next();
+				if (runningServices.contains(startingService)) {
+					Log.i(TAG, "PhoneLab service " + startingService + " already running. Will not be started.");
+				} else {
+					Log.i(TAG, "Starting PhoneLab service " + startingService);
+					Intent startingIntent = new Intent(startingService);
+					this.startService(startingIntent);
+				}
+			}
+			
+			Iterator<String> stoppingServicesIterator = stoppingServices.iterator();
+			while (stoppingServicesIterator.hasNext()) {
+				String stoppingService = stoppingServicesIterator.next();
+				if (!(runningServices.contains(stoppingService))) {
+					Log.i(TAG, "PhoneLab service " + stoppingService + " not running. Will not be stopped.");
+				} else {
+					Log.i(TAG, "Stopping PhoneLab service " + stoppingService);
+					Intent stoppingIntent = new Intent(stoppingService);
+					this.stopService(stoppingIntent);
+				}
+			}
 		}
+		
+		Log.i(TAG, "Completed loading new parameters.");
 		
 		currentManifestParameters = newManifestParameters;
 		TAG = currentManifestParameters.logTag;

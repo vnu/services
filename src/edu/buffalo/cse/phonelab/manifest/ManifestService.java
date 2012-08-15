@@ -304,13 +304,17 @@ public class ManifestService extends Service implements ManifestInterface {
 			
 			Log.v(TAG, "Updating update rate.");
 			
+			int nextInterval;
 			if (updateManifestExecutor != null) {
 				updateManifestExecutor.shutdown();
+				nextInterval = newManifestParameters.updateRate;
+			} else {
+				nextInterval = 0;
 			}
 			
 			updateManifestExecutor = new ScheduledThreadPoolExecutor(1);
 			updateManifestExecutor.scheduleAtFixedRate(updateManifestTask,
-					newManifestParameters.updateRate, newManifestParameters.updateRate, TimeUnit.SECONDS);
+					nextInterval, newManifestParameters.updateRate, TimeUnit.SECONDS);
 			
 			Log.v(TAG, "Updated updateRate to " + newManifestParameters.updateRate + ".");
 		}

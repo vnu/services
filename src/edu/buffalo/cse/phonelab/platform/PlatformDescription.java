@@ -13,4 +13,18 @@ public class PlatformDescription {
 	
 	@Attribute
 	public String relativePath;
+	
+	@Attribute
+	public Integer size;
+	
+	@Attribute(required=false)
+	public Boolean currentPlatform;
+	
+	@Attribute(required=false)
+	public Boolean goldenPlatform;
+	
+	public PlatformDescription() {
+		currentPlatform = false;
+		goldenPlatform = false;
+	}
 }

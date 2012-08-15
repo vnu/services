@@ -19,7 +19,12 @@
             </intent-filter>
         </receiver>
         
-        <service android:enabled="true" android:name=".manifest.ManifestService" />
+        <service android:enabled="true" android:name=".manifest.ManifestService">
+            <intent-filter><action android:name=".manifest.ManifestService"></action></intent-filter>
+        </service>
         <service android:enabled="true" android:name=".launcher.LauncherService" />
+        <service android:enabled="true" android:name=".platform.PlatformService">
+            <intent-filter><action android:name=".platform.PlatformService"></action></intent-filter>
+        </service>
     </application>
 </manifest>

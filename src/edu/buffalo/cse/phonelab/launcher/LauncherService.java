@@ -49,17 +49,6 @@ public class LauncherService extends Service implements ManifestInterface {
 	private ScheduledThreadPoolExecutor checkServicesExecutor;
 	private CheckServicesTask checkServicesTask;
 	
-	@Override
-	public int onStartCommand(Intent intent, int flags, int startId) {
-			
-		checkServicesTask = new CheckServicesTask();
-		
-		Intent manifestServiceIntent = new Intent(this, ManifestService.class);
-		bindService(manifestServiceIntent, manifestServiceConnection, Context.BIND_AUTO_CREATE);
-		
-		return START_STICKY;
-	}
-	
 	private ServiceConnection manifestServiceConnection = new ServiceConnection() {
 		
 		@Override
@@ -74,6 +63,17 @@ public class LauncherService extends Service implements ManifestInterface {
 			LauncherService.this.stopSelf();
 		}
 	};
+	
+	@Override
+	public int onStartCommand(Intent intent, int flags, int startId) {
+			
+		checkServicesTask = new CheckServicesTask();
+		
+		Intent manifestServiceIntent = new Intent(this, ManifestService.class);
+		bindService(manifestServiceIntent, manifestServiceConnection, Context.BIND_AUTO_CREATE);
+		
+		return START_STICKY;
+	}
 	
 	@Override
 	public IBinder onBind(Intent arg0) {

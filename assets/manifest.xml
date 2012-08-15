@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<manifest>
+  <edu.buffalo.cse.phonelab.manifest.ManifestService>
+    <logTag>ManifestService</logTag>
+    <updateRate>30</updateRate>
+    <compareFiles>False</compareFiles>
+    <compareNodes>False</compareNodes>
+    <manifestURL>http://blue.cse.buffalo.edu/manifest/</manifestURL>
+  </edu.buffalo.cse.phonelab.manifest.ManifestService>
+  <edu.buffalo.cse.phonelab.launcher.LauncherService>
+    <logTag>LauncherService</logTag>
+    <checkInterval>30</checkInterval>
+    <phoneLabRunningServices>
+      <string>edu.buffalo.cse.phonelab.manifest.ManifestService</string>
+    </phoneLabRunningServices>
+    <phoneLabStoppedServices>
+      <string>edu.buffalo.cse.phonelab.Dummy.DummyService</string>
+    </phoneLabStoppedServices>
+  </edu.buffalo.cse.phonelab.launcher.LauncherService>
+</manifest>

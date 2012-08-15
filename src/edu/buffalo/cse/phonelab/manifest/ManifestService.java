@@ -107,7 +107,7 @@ public class ManifestService extends Service implements ManifestInterface {
 			Log.i(TAG, "Copying manifest from assets.");
 			
 			try {
-				assetManifestStream = new BufferedInputStream(assetManager.open("server-manifest.xml", AssetManager.ACCESS_BUFFER));
+				assetManifestStream = new BufferedInputStream(assetManager.open("manifest.xml", AssetManager.ACCESS_BUFFER));
 				serverManifestStream = new BufferedOutputStream(new FileOutputStream(serverManifestFile));
 				copyFile(assetManifestStream, serverManifestStream);
 			} catch (Exception e) {

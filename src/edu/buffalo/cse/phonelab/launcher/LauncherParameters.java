@@ -13,15 +13,15 @@ public class LauncherParameters {
 	public Integer checkInterval;
 	
 	@ElementList(type=String.class)
-	public HashSet<String> phoneLabRunningServices;
+	public HashSet<String> runningServices;
 	
 	@ElementList(type=String.class)
-	public HashSet<String> phoneLabStoppedServices;
+	public HashSet<String> stoppedServices;
 	
 	public LauncherParameters() {
 		logTag = "LauncherService";
-		phoneLabRunningServices = new HashSet<String>();
-		phoneLabStoppedServices = new HashSet<String>();
+		runningServices = new HashSet<String>();
+		stoppedServices = new HashSet<String>();
 	}
 	
 	@Override
@@ -35,7 +35,7 @@ public class LauncherParameters {
 		LauncherParameters lhs = (LauncherParameters) o;
 		
 		return logTag != null && logTag.equals(lhs.logTag) &&
-				phoneLabRunningServices != null && phoneLabRunningServices.equals(lhs.phoneLabRunningServices) &&
-				phoneLabStoppedServices != null && phoneLabStoppedServices.equals(lhs.phoneLabStoppedServices);
+				runningServices != null && runningServices.equals(lhs.runningServices) &&
+				stoppedServices != null && stoppedServices.equals(lhs.stoppedServices);
 	}
 }

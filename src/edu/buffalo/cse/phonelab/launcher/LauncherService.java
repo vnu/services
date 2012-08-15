@@ -21,7 +21,24 @@ import edu.buffalo.cse.phonelab.manifest.ManifestInterface;
 import edu.buffalo.cse.phonelab.manifest.ManifestService;
 import edu.buffalo.cse.phonelab.manifest.ManifestService.ManifestBinder;
 
+/*
+ * 15 Aug 2012 : GWA : Example of a simple PhoneLab service.
+ * 
+ * 1) It binds to the ManifestService and registers for manifest updates.
+ * 2) It processes manifest updates, deserializing them into LauncherParameter objects using the simple library.
+ * 3) It uses a periodic task to check that services are running or stopped as specified by the manifest.
+ * 4) The task interval and logging tag are also controlled by the manifest.
+ * 
+ */
+
 public class LauncherService extends Service implements ManifestInterface {
+	
+	/*
+	 * 15 Aug 2012 : GWA : PhoneLab services should allow their logging tags to be controlled by a logTag manifest parameter like LauncherParameters.logTag. However,
+	 * to enable logging before you receive a manifest update you can use an initialized TAG variable like this.
+	 * 
+	 * See updateParameters() below for how to overwrite this on a manifest update.
+	 */
 	
 	private String TAG = "LauncherService";
 	
@@ -89,6 +106,10 @@ public class LauncherService extends Service implements ManifestInterface {
 				currentLauncherParameters.checkInterval == null ||
 				(!(currentLauncherParameters.checkInterval.equals(newLauncherParameters.checkInterval)))) {
 			
+			/*
+			 * 15 Aug 2012 : GWA : When started for the first time check immediately.
+			 */
+			
 			int nextInterval;
 			if (checkServicesExecutor != null) {
 				nextInterval = newLauncherParameters.checkInterval;
@@ -123,7 +144,7 @@ public class LauncherService extends Service implements ManifestInterface {
 			runningServices.add(runningServiceInfo.service.getClassName());
 		}
 		
-		Iterator<String> startingServicesIterator = currentLauncherParameters.phoneLabRunningServices.iterator();
+		Iterator<String> startingServicesIterator = currentLauncherParameters.runningServices.iterator();
 		while (startingServicesIterator.hasNext()) {
 			String startingService = startingServicesIterator.next();
 			if (runningServices.contains(startingService)) {
@@ -135,7 +156,7 @@ public class LauncherService extends Service implements ManifestInterface {
 			}
 		}
 		
-		Iterator<String> stoppingServicesIterator = currentLauncherParameters.phoneLabStoppedServices.iterator();
+		Iterator<String> stoppingServicesIterator = currentLauncherParameters.stoppedServices.iterator();
 		while (stoppingServicesIterator.hasNext()) {
 			String stoppingService = stoppingServicesIterator.next();
 			if (!(runningServices.contains(stoppingService))) {
@@ -148,9 +169,12 @@ public class LauncherService extends Service implements ManifestInterface {
 		}
 	}
 	
+	/*
+	 * 15 Aug 2012 : GWA : Not supported yet by the ManifestService.
+	 */
+	
 	@Override
 	public String localUpdate() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 }

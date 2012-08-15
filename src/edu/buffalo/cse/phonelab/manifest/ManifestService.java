@@ -4,6 +4,7 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -15,6 +16,9 @@ import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -37,7 +41,9 @@ import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
 
+import android.app.ActivityManager;
 import android.app.Service;
+import android.app.ActivityManager.RunningServiceInfo;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.AssetManager;
@@ -47,6 +53,8 @@ import android.telephony.TelephonyManager;
 import android.util.Log;
 
 public class ManifestService extends Service implements ManifestInterface {
+	
+	private String TAG = "ManifestService";
 	
 	private final IBinder manifestBinder = new ManifestBinder();
 	
@@ -68,7 +76,7 @@ public class ManifestService extends Service implements ManifestInterface {
 	private ScheduledThreadPoolExecutor updateManifestExecutor;
 	private UpdateManifestTask updateManifestTask;
 	
-	private ManifestParameters manifestParameters;
+	private ManifestParameters currentManifestParameters = null;
 	
 	private File serverManifestFile;
 	private byte[] serverManifestDigest;
@@ -89,12 +97,7 @@ public class ManifestService extends Service implements ManifestInterface {
 	
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
-		
-		manifestParameters = new ManifestParameters();
-		manifestParameters.logTag = "ManifestService";
-		manifestParameters.compareFiles = true;
-		manifestParameters.compareNodes = true;
-		
+				
 		File manifestDir = getApplicationContext().getDir("manifest", Context.MODE_PRIVATE);
 		serverManifestFile = new File(manifestDir, "server.xml");
 		clientManifestFile = new File(manifestDir, "client.xml");
@@ -106,7 +109,7 @@ public class ManifestService extends Service implements ManifestInterface {
 			BufferedInputStream assetManifestStream;
 			BufferedOutputStream serverManifestStream;
 			
-			Log.i(manifestParameters.logTag, "Copying manifest from assets.");
+			Log.i(TAG, "Copying manifest from assets.");
 			
 			try {
 				assetManifestStream = new BufferedInputStream(assetManager.open("server-manifest.xml", AssetManager.ACCESS_BUFFER));
@@ -114,7 +117,7 @@ public class ManifestService extends Service implements ManifestInterface {
 				copyFile(assetManifestStream, serverManifestStream);
 			} catch (Exception e) {
 				this.stopSelfResult(startId);
-				Log.d(manifestParameters.logTag, "Failed to start." + e);
+				Log.d(TAG, "Failed to start." + e);
 				return START_NOT_STICKY;
 			}
 		}
@@ -123,12 +126,16 @@ public class ManifestService extends Service implements ManifestInterface {
 			serverManifestDigest = hashFile(serverManifestFile);
 		} catch (Exception e) {
 			this.stopSelfResult(startId);
-			Log.d(manifestParameters.logTag, "Failed to start." + e);
+			Log.d(TAG, "Failed to start." + e);
 			return START_NOT_STICKY;
 		}
 		
 		updateManifestTask = new UpdateManifestTask();
+		
+		ManifestParameters newManifestParameters = new ManifestParameters();
+		updateParameters(newManifestParameters);
 		manifestBuilderFactory = DocumentBuilderFactory.newInstance();
+		
 		try {
 			manifestBuilder = manifestBuilderFactory.newDocumentBuilder();
 			receiverHash.clear();
@@ -136,11 +143,11 @@ public class ManifestService extends Service implements ManifestInterface {
 			
 		} catch (Exception e) {
 			this.stopSelfResult(startId);
-			Log.d(manifestParameters.logTag, "Failed to start." + e);
+			Log.d(TAG, "Failed to start." + e);
 			return START_NOT_STICKY;
 		}
 		
-		Log.i(manifestParameters.logTag, "Started.");
+		Log.i(TAG, "Started.");
 		return START_STICKY;
 	}
 	
@@ -148,77 +155,59 @@ public class ManifestService extends Service implements ManifestInterface {
 		@Override
 		public void run() {
 			try {
-				reloadManifest();
+				boolean receivedNewManifest = downloadManifest();
+				if (receivedNewManifest == true ||
+					currentManifestParameters.compareFiles == false) {
+					distributeManifest();
+				}
 			} catch (Exception e) {
-				Log.d(manifestParameters.logTag, "reloadManifest() failed " + e.toString());
+				Log.d(TAG, "reloadManifest() failed " + e.toString());
 			}
 		}
 	}
 	
-	private void reloadManifest() throws NoSuchAlgorithmException, TransformerConfigurationException, SAXException, IOException, TransformerFactoryConfigurationError {
-		reloadManifest(false);
-	}
-	
-	private synchronized void reloadManifest(boolean ignoreFileSimilarity) throws NoSuchAlgorithmException, TransformerConfigurationException, TransformerFactoryConfigurationError, IOException {
+	private synchronized boolean downloadManifest() throws NoSuchAlgorithmException {
 
-		
 		MessageDigest downloadManifestDigester = MessageDigest.getInstance("MD5");
 		byte[] downloadManifestDigest = null;
+		String downloadManifestString = currentManifestParameters.manifestURL + ((TelephonyManager) getApplicationContext().getSystemService(Context.TELEPHONY_SERVICE)).getDeviceId() + "/manifest.xml";
 		
-		if (manifestParameters.manifestURL != null) {
-			String downloadManifestString = manifestParameters.manifestURL + ((TelephonyManager) getApplicationContext().getSystemService(Context.TELEPHONY_SERVICE)).getDeviceId() + "/manifest.xml";
+		try {	
 			URL downloadManifestURL = new URL(downloadManifestString);
-			try {
-				
-				HttpURLConnection downloadManifestConnection = (HttpURLConnection) downloadManifestURL.openConnection();
-				BufferedOutputStream newManifestStream = new BufferedOutputStream(new FileOutputStream(newManifestFile));
-				
-				try {
-					DigestInputStream downloadManifestStream = new DigestInputStream(new BufferedInputStream(downloadManifestConnection.getInputStream()), downloadManifestDigester);
-					copyFile(downloadManifestStream, newManifestStream);
-				} finally {
-					downloadManifestConnection.disconnect();		
-				}
-				if (newManifestFile.exists() && (newManifestFile.length() != 0)) {
-					copyFile(newManifestFile, serverManifestFile);
-					downloadManifestDigest = downloadManifestDigester.digest();
-					Log.i(manifestParameters.logTag, "Retrieved manifest with length " + newManifestFile.length() + " from " + downloadManifestString);
-				}
-			} catch (IOException e) {
-				e.printStackTrace();
-				Log.i(manifestParameters.logTag, "Unable to download manifest from " + downloadManifestString);
-			}
-		}
-		
-		boolean manifestChanged = false;
-		
-		if (ignoreFileSimilarity) {
-			manifestChanged = true;
-			Log.i(manifestParameters.logTag, "ignoreFileSimilarity forced manifest update.");
-		} else if (!(manifestParameters.compareFiles)) {
-			manifestChanged = true;
-			Log.i(manifestParameters.logTag, "Updates forced regardless of file similarity.");
-		} else if (downloadManifestDigest != null) {
-			if (!(MessageDigest.isEqual(serverManifestDigest, downloadManifestDigest))) {
-				manifestChanged = true;
-				serverManifestDigest = downloadManifestDigest;
-				Log.i(manifestParameters.logTag, "Digest difference forced manifest update.");
-			}
-		}
-		
-		if (manifestChanged) {
-			Log.i(manifestParameters.logTag, "Manifest has changed or updating was forced.");
-			BufferedInputStream manifestInputStream = new BufferedInputStream(new FileInputStream(serverManifestFile));
-			try {
-				manifestDocument = manifestBuilder.parse(manifestInputStream);
-			} catch (SAXException e) {
-				Log.d(manifestParameters.logTag, "Unable to parse manifest. Not loading new parameters.");
-				return;
-			}
+			HttpURLConnection downloadManifestConnection = (HttpURLConnection) downloadManifestURL.openConnection();
+			BufferedOutputStream newManifestStream = new BufferedOutputStream(new FileOutputStream(newManifestFile));
 			
-		} else {
-			Log.i(manifestParameters.logTag, "Manifest is unchanged.");
-			return;
+			try {
+				DigestInputStream downloadManifestStream = new DigestInputStream(new BufferedInputStream(downloadManifestConnection.getInputStream()), downloadManifestDigester);
+				copyFile(downloadManifestStream, newManifestStream);
+			} finally {
+				downloadManifestConnection.disconnect();		
+			}
+			if (newManifestFile.exists() && (newManifestFile.length() != 0)) {
+				copyFile(newManifestFile, serverManifestFile);
+				downloadManifestDigest = downloadManifestDigester.digest();
+				Log.i(TAG, "Retrieved manifest with length " + newManifestFile.length() + " from " + downloadManifestString);
+			} else {
+				Log.d(TAG, "Manifest cannot be saved or has zero length.");
+				return false;
+			}
+		} catch (IOException e) {
+			Log.i(TAG, "Unable to download manifest from " + downloadManifestString + ": " + e);
+			return false;
+		}
+		
+		return (!(MessageDigest.isEqual(serverManifestDigest, downloadManifestDigest)));
+	}
+	
+	public synchronized boolean distributeManifest() throws TransformerConfigurationException, TransformerFactoryConfigurationError {
+		
+		BufferedInputStream manifestInputStream;
+		try {
+			manifestInputStream = new BufferedInputStream(new FileInputStream(serverManifestFile));
+			manifestDocument = manifestBuilder.parse(manifestInputStream);
+		} catch (Exception e) {
+			Log.d(TAG, "Unable to parse and distribute manifest: " + e);
+			return false;
 		}
 	
 		XPath manifestXPath = XPathFactory.newInstance().newXPath();
@@ -231,7 +220,7 @@ public class ManifestService extends Service implements ManifestInterface {
 			String receiverName = entry.getKey();
 			ManifestReceiver manifestReceiver = entry.getValue();
 			
-			Log.i(manifestParameters.logTag, "Looking for " + receiverName + " in receive hash.");
+			Log.i(TAG, "Looking for " + receiverName + " in receive hash.");
 			String classNamePattern = "/manifest/" + receiverName;
 			try {
 				Node newReceiverNode = (Node) manifestXPath.evaluate(classNamePattern, manifestDocument, XPathConstants.NODE);
@@ -240,18 +229,18 @@ public class ManifestService extends Service implements ManifestInterface {
 				boolean nodeChanged = false;
 				
 				if (manifestReceiver.node == null) {
-					Log.i(manifestParameters.logTag, "No record for this receiver.");
+					Log.i(TAG, "No record for this receiver.");
 					nodeChanged = true;
-				} else if (!(manifestParameters.compareNodes)) {
-					Log.i(manifestParameters.logTag, "Updates forced regardless of node similarity.");
+				} else if (!(currentManifestParameters.compareNodes)) {
+					Log.i(TAG, "Updates forced regardless of node similarity.");
 					nodeChanged = true;
 				} else if (!(newReceiverNode.isEqualNode(manifestReceiver.node))) {
-					Log.i(manifestParameters.logTag, "Updates due to changes in manifest for this receiver.");
+					Log.i(TAG, "Updates due to changes in manifest for this receiver.");
 					nodeChanged = true;
 				}
 				
 				if (nodeChanged) {
-					Log.i(manifestParameters.logTag, "Manifest for " + receiverName + " has changed. Updating.");
+					Log.i(TAG, "Manifest for " + receiverName + " has changed. Updating.");
 					manifestReceiver.node = newReceiverNode;
 					entry.setValue(manifestReceiver);
 					
@@ -261,59 +250,61 @@ public class ManifestService extends Service implements ManifestInterface {
 					transformer.transform(domSource, result);
 					manifestReceiver.receiver.remoteUpdate(writer.toString());
 				} else {
-					Log.i(manifestParameters.logTag, "Manifest for " + receiverName + " is unchanged.");
+					Log.i(TAG, "Manifest for " + receiverName + " is unchanged.");
 				}
 			} catch (Exception e) {
-				Log.d(manifestParameters.logTag, e.toString());
+				Log.d(TAG, e.toString());
 				continue;
 			}
 		}
-		return;
+		return true;
 	}
 		
 	public void receiveManifestUpdates(ManifestInterface receiver) {
 		assert receiverHash.containsKey(receiver.getClass().getName()) == false : receiver;
 		ManifestReceiver manifestReceiver = new ManifestReceiver(receiver, null);
 		receiverHash.put(receiver.getClass().getName(), manifestReceiver);
-		Log.i(manifestParameters.logTag, "Registered " + receiver.getClass().getName() + " for manifest updates.");
 		try {
-			reloadManifest(true);
+			distributeManifest();
 		} catch (Exception e) {
-			e.printStackTrace();
+			Log.d(TAG, "Unable to distribute manifest.");
 		}
+		Log.i(TAG, "Registered " + receiver.getClass().getName() + " for manifest updates.");
 	}
 	
 	public void discardManifestUpdates(ManifestInterface receiver) {
 		assert receiverHash.containsKey(receiver.getClass().getName()) : receiver;
 		receiverHash.remove(receiver.getClass().getName());
-		Log.i(manifestParameters.logTag, "Removed " + receiver.getClass().getName() + " for manifest updates.");
+		Log.i(TAG, "Removed " + receiver.getClass().getName() + " for manifest updates.");
 	}
 	
 	@Override
 	public void remoteUpdate(String manifestString) {
-		Log.i(manifestParameters.logTag, manifestString);
+		Log.i(TAG, manifestString);
 		Serializer parameterDeserializer = new Persister();
-		ManifestParameters newParameters;
+		ManifestParameters newManifestParameters;
 		try {
-			newParameters = parameterDeserializer.read(ManifestParameters.class, manifestString);
+			newManifestParameters = parameterDeserializer.read(ManifestParameters.class, manifestString);
 		} catch (Exception e) {
 			Log.d("ManifestService", e.toString());
 			return;
 		}
-		if (!(manifestParameters.equals(newParameters))) {
-			Log.i(manifestParameters.logTag, "Manifest parameters have changed. Updating.");
-			updateParameters(newParameters);
+		if (!(currentManifestParameters.equals(newManifestParameters))) {
+			Log.i(TAG, "Manifest parameters have changed. Updating.");
+			updateParameters(newManifestParameters);
 		} else {
-			Log.i(manifestParameters.logTag, "Manifest parameters for ManifestService are unchanged.");
+			Log.i(TAG, "Manifest parameters for ManifestService are unchanged.");
 		}
-		Log.i(manifestParameters.logTag, "Received new manifest.");
+		Log.i(TAG, "Received new manifest.");
 	}
 
-	private void updateParameters(ManifestParameters newParameters) {
+	private void updateParameters(ManifestParameters newManifestParameters) {
 		
-		Log.v(manifestParameters.logTag, newParameters.toString());
-		
-		if (manifestParameters.updateRate != newParameters.updateRate) {
+		if (currentManifestParameters == null ||
+			currentManifestParameters.updateRate == null ||
+			currentManifestParameters.updateRate != newManifestParameters.updateRate) {
+			
+			Log.v(TAG, "Updating update rate.");
 			
 			if (updateManifestExecutor != null) {
 				updateManifestExecutor.shutdown();
@@ -321,12 +312,55 @@ public class ManifestService extends Service implements ManifestInterface {
 			
 			updateManifestExecutor = new ScheduledThreadPoolExecutor(1);
 			updateManifestExecutor.scheduleAtFixedRate(updateManifestTask,
-					newParameters.updateRate, newParameters.updateRate, TimeUnit.SECONDS);
+					newManifestParameters.updateRate, newManifestParameters.updateRate, TimeUnit.SECONDS);
 			
-			Log.i("ManifestService", "Updated updateRate.");
+			Log.v("ManifestService", "Updated updateRate.");
 		}
 		
-		manifestParameters = newParameters;
+		if (currentManifestParameters == null ||
+			currentManifestParameters.phoneLabServices == null ||
+			!(currentManifestParameters.phoneLabServices.equals(newManifestParameters.phoneLabServices))) {
+			
+			Log.v(TAG, "Updating PhoneLab services.");
+			
+			HashSet<String> startingServices = new HashSet<String>();
+			HashSet<String> stoppingServices = new HashSet<String>();
+			
+			if (currentManifestParameters != null &&
+				currentManifestParameters.phoneLabServices != null) {
+				Iterator<String> phoneLabServicesIterator = currentManifestParameters.phoneLabServices.iterator();
+				String phoneLabService;
+				while (phoneLabServicesIterator.hasNext()) {
+					phoneLabService = phoneLabServicesIterator.next();
+					if (!(newManifestParameters.phoneLabServices.contains(phoneLabService))) {
+						stoppingServices.add(phoneLabService);
+						Log.v(TAG, "Preparing to stop PhoneLab service " + phoneLabService);
+					}
+				}
+			}
+			
+			Iterator<String> phoneLabServicesIterator = newManifestParameters.phoneLabServices.iterator();
+			String phoneLabService;
+			while (phoneLabServicesIterator.hasNext()) {
+				phoneLabService = phoneLabServicesIterator.next();
+				if (currentManifestParameters == null ||
+					currentManifestParameters.phoneLabServices == null || 
+					!(currentManifestParameters.phoneLabServices.contains(phoneLabService))) {
+					startingServices.add(phoneLabService);
+					Log.v(TAG, "Preparing to start PhoneLab service " + phoneLabService);
+				}
+			}
+			
+			HashSet<String> runningServices = new HashSet<String>();
+			ActivityManager activityManager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+			
+			for (RunningServiceInfo runningServiceInfo : activityManager.getRunningServices(Integer.MAX_VALUE)) {
+				runningServices.add(runningServiceInfo.service.getClassName());
+			}
+		}
+		
+		currentManifestParameters = newManifestParameters;
+		TAG = currentManifestParameters.logTag;
 	}
 	
 	@Override

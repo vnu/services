@@ -8,5 +8,9 @@
         <compareNodes>True</compareNodes>
         
         <manifestURL>http://blue.cse.buffalo.edu/manifest/</manifestURL>
+        <phoneLabServices>
+            <string>edu.buffalo.cse.phonelab.platform.DummyService</string>
+            <string>edu.buffalo.cse.phonelab.platform.PlatformService</string>
+        </phoneLabServices>
     </edu.buffalo.cse.phonelab.manifest.ManifestService>
 </manifest>

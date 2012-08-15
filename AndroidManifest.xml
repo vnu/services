@@ -20,5 +20,6 @@
         </receiver>
         
         <service android:enabled="true" android:name=".manifest.ManifestService" />
+        <service android:enabled="true" android:name=".launcher.LauncherService" />
     </application>
 </manifest>

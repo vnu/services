@@ -1,12 +1,9 @@
 package edu.buffalo.cse.phonelab.manifest;
 
 import java.util.Formatter;
-import java.util.HashSet;
-import java.util.List;
 import java.util.Locale;
 
 import org.simpleframework.xml.Element;
-import org.simpleframework.xml.ElementList;
 import org.simpleframework.xml.Root;
 
 @Root
@@ -27,8 +24,6 @@ public class ManifestParameters {
 	@Element
 	public String manifestURL;
 	
-	@ElementList(type=String.class)
-	public HashSet<String> phoneLabServices;
 	
 	public ManifestParameters() {
 		logTag = "ManifestParameters";
@@ -36,7 +31,6 @@ public class ManifestParameters {
 		manifestURL = "http://blue.cse.buffalo.edu/manifest/";
 		compareFiles = false;
 		compareNodes = false;
-		phoneLabServices = new HashSet<String>();
 	}
 	
 	@Override
@@ -63,8 +57,6 @@ public class ManifestParameters {
 				logTag != null && logTag.equals(lhs.logTag) &&
 				compareFiles != null && compareFiles.equals(lhs.compareFiles) &&
 				compareNodes != null && compareNodes.equals(lhs.compareNodes) &&
-				manifestURL != null && manifestURL.equals(lhs.manifestURL) &&
-				phoneLabServices != null && phoneLabServices.equals(lhs.phoneLabServices);
-				
+				manifestURL != null && manifestURL.equals(lhs.manifestURL);		
 	}
 }

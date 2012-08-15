@@ -4,7 +4,6 @@ import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
@@ -16,9 +15,6 @@ import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -39,11 +35,8 @@ import org.simpleframework.xml.Serializer;
 import org.simpleframework.xml.core.Persister;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
-import org.xml.sax.SAXException;
 
-import android.app.ActivityManager;
 import android.app.Service;
-import android.app.ActivityManager.RunningServiceInfo;
 import android.content.Context;
 import android.content.Intent;
 import android.content.res.AssetManager;
@@ -51,6 +44,7 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import edu.buffalo.cse.phonelab.launcher.LauncherService;
 
 public class ManifestService extends Service implements ManifestInterface {
 	
@@ -81,11 +75,12 @@ public class ManifestService extends Service implements ManifestInterface {
 	private File serverManifestFile;
 	private byte[] serverManifestDigest;
 	
+	@SuppressWarnings("unused")
 	private File clientManifestFile;
 	private File newManifestFile;
 	
 	public class ManifestBinder extends Binder {
-		ManifestService getService() {
+		public ManifestService getService() {
 			return ManifestService.this;
 		}
 	}
@@ -147,7 +142,10 @@ public class ManifestService extends Service implements ManifestInterface {
 			return START_NOT_STICKY;
 		}
 		
-		Log.i(TAG, "Started.");
+		Intent launcherServiceIntent = new Intent(getApplicationContext(), LauncherService.class);
+		this.startService(launcherServiceIntent);
+		
+		Log.i(TAG, "Started launcher service. Manifest service started.");
 		return START_STICKY;
 	}
 	
@@ -280,13 +278,13 @@ public class ManifestService extends Service implements ManifestInterface {
 	
 	@Override
 	public void remoteUpdate(String manifestString) {
-		Log.i(TAG, manifestString);
+		Log.v(TAG, manifestString);
 		Serializer parameterDeserializer = new Persister();
 		ManifestParameters newManifestParameters;
 		try {
 			newManifestParameters = parameterDeserializer.read(ManifestParameters.class, manifestString);
 		} catch (Exception e) {
-			Log.d("ManifestService", e.toString());
+			Log.d(TAG, "Could not deserialize manifest string: " + e.toString());
 			return;
 		}
 		if (!(currentManifestParameters.equals(newManifestParameters))) {
@@ -314,73 +312,7 @@ public class ManifestService extends Service implements ManifestInterface {
 			updateManifestExecutor.scheduleAtFixedRate(updateManifestTask,
 					newManifestParameters.updateRate, newManifestParameters.updateRate, TimeUnit.SECONDS);
 			
-			Log.v("ManifestService", "Updated updateRate.");
-		}
-		
-		if (currentManifestParameters == null ||
-			currentManifestParameters.phoneLabServices == null ||
-			!(currentManifestParameters.phoneLabServices.equals(newManifestParameters.phoneLabServices))) {
-			
-			Log.v(TAG, "Updating PhoneLab services.");
-			
-			HashSet<String> startingServices = new HashSet<String>();
-			HashSet<String> stoppingServices = new HashSet<String>();
-			
-			if (currentManifestParameters != null &&
-				currentManifestParameters.phoneLabServices != null) {
-				Iterator<String> phoneLabServicesIterator = currentManifestParameters.phoneLabServices.iterator();
-				String phoneLabService;
-				while (phoneLabServicesIterator.hasNext()) {
-					phoneLabService = phoneLabServicesIterator.next();
-					if (!(newManifestParameters.phoneLabServices.contains(phoneLabService))) {
-						stoppingServices.add(phoneLabService);
-						Log.v(TAG, "Preparing to stop PhoneLab service " + phoneLabService);
-					}
-				}
-			}
-			
-			Iterator<String> phoneLabServicesIterator = newManifestParameters.phoneLabServices.iterator();
-			String phoneLabService;
-			while (phoneLabServicesIterator.hasNext()) {
-				phoneLabService = phoneLabServicesIterator.next();
-				if (currentManifestParameters == null ||
-					currentManifestParameters.phoneLabServices == null || 
-					!(currentManifestParameters.phoneLabServices.contains(phoneLabService))) {
-					startingServices.add(phoneLabService);
-					Log.v(TAG, "Preparing to start PhoneLab service " + phoneLabService);
-				}
-			}
-			
-			HashSet<String> runningServices = new HashSet<String>();
-			ActivityManager activityManager = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
-			
-			for (RunningServiceInfo runningServiceInfo : activityManager.getRunningServices(Integer.MAX_VALUE)) {
-				runningServices.add(runningServiceInfo.service.getClassName());
-			}
-			
-			Iterator<String> startingServicesIterator = startingServices.iterator();
-			while (startingServicesIterator.hasNext()) {
-				String startingService = startingServicesIterator.next();
-				if (runningServices.contains(startingService)) {
-					Log.i(TAG, "PhoneLab service " + startingService + " already running. Will not be started.");
-				} else {
-					Log.i(TAG, "Starting PhoneLab service " + startingService);
-					Intent startingIntent = new Intent(startingService);
-					this.startService(startingIntent);
-				}
-			}
-			
-			Iterator<String> stoppingServicesIterator = stoppingServices.iterator();
-			while (stoppingServicesIterator.hasNext()) {
-				String stoppingService = stoppingServicesIterator.next();
-				if (!(runningServices.contains(stoppingService))) {
-					Log.i(TAG, "PhoneLab service " + stoppingService + " not running. Will not be stopped.");
-				} else {
-					Log.i(TAG, "Stopping PhoneLab service " + stoppingService);
-					Intent stoppingIntent = new Intent(stoppingService);
-					this.stopService(stoppingIntent);
-				}
-			}
+			Log.v(TAG, "Updated updateRate to " + newManifestParameters.updateRate + ".");
 		}
 		
 		Log.i(TAG, "Completed loading new parameters.");

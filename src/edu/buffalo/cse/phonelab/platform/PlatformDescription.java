@@ -12,7 +12,7 @@ public class PlatformDescription {
 	public String url;
 	
 	@Attribute
-	public String relativePath;
+	public String filename;
 	
 	@Attribute
 	public Integer size;
@@ -26,5 +26,23 @@ public class PlatformDescription {
 	public PlatformDescription() {
 		currentPlatform = false;
 		goldenPlatform = false;
+	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) {
+			return true;
+		}
+		if (!(o instanceof PlatformDescription)) {
+			return false;
+		}
+		PlatformDescription lhs = (PlatformDescription) o;
+		
+		return fingerprint != null && fingerprint.equals(lhs.fingerprint) &&
+				url != null && url.equals(lhs.url) &&
+				filename != null && filename.equals(lhs.filename) &&
+				size != null && size.equals(lhs.size) &&
+				currentPlatform != null && currentPlatform.equals(lhs.currentPlatform) &&
+				goldenPlatform != null && goldenPlatform.equals(lhs.goldenPlatform);
 	}
 }

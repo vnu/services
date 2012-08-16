@@ -149,6 +149,15 @@ public class ManifestService extends Service implements ManifestInterface {
 		return START_STICKY;
 	}
 	
+	@Override
+	public void onDestroy() {
+		if (updateManifestExecutor != null) {
+			updateManifestExecutor.shutdown();
+		}
+		Intent launcherServiceIntent = new Intent(getApplicationContext(), LauncherService.class);
+		this.stopService(launcherServiceIntent);
+	}
+	
 	private class UpdateManifestTask implements Runnable {
 		@Override
 		public void run() {

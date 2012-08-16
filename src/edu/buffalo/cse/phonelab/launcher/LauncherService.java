@@ -76,6 +76,18 @@ public class LauncherService extends Service implements ManifestInterface {
 	}
 	
 	@Override
+	public void onDestroy() {
+		if (checkServicesExecutor != null) {
+			checkServicesExecutor.shutdown();
+		}
+		
+		LauncherParameters finalLauncherParameters = new LauncherParameters();
+		finalLauncherParameters.stoppedServices.addAll(currentLauncherParameters.runningServices);
+		finalLauncherParameters.stoppedServices.addAll(currentLauncherParameters.stoppedServices);
+		checkServices();
+	}
+	
+	@Override
 	public IBinder onBind(Intent arg0) {
 		return null;
 	}

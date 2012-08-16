@@ -3,11 +3,13 @@
     android:versionCode="1"
     android:versionName="1.0">
 
-    <uses-sdk android:minSdkVersion="8" android:targetSdkVersion="15" />
+    <uses-sdk android:minSdkVersion="9" android:targetSdkVersion="15" />
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.DOWNLOAD_WITHOUT_NOTIFICATION" />
     
     <application android:label="@string/app_name"
         android:icon="@drawable/ic_launcher"
@@ -20,11 +22,11 @@
         </receiver>
         
         <service android:enabled="true" android:name=".manifest.ManifestService">
-            <intent-filter><action android:name=".manifest.ManifestService"></action></intent-filter>
+            <intent-filter><action android:name="edu.buffalo.cse.phonelab.manifest.ManifestService"></action></intent-filter>
         </service>
         <service android:enabled="true" android:name=".launcher.LauncherService" />
         <service android:enabled="true" android:name=".platform.PlatformService">
-            <intent-filter><action android:name=".platform.PlatformService"></action></intent-filter>
+            <intent-filter><action android:name="edu.buffalo.cse.phonelab.platform.PlatformService"></action></intent-filter>
         </service>
     </application>
 </manifest>

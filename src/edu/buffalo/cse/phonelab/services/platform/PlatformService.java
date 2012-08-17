@@ -246,8 +246,6 @@ public class PlatformService extends Service implements ManifestInterface {
 
 	@Override
 	public String localUpdate() {
-		return null;
-		/*
 		Serializer serializer = new Persister();
 		StringWriter writer = new StringWriter();
 		try {
@@ -257,7 +255,7 @@ public class PlatformService extends Service implements ManifestInterface {
 		}
 		String localManifest = writer.toString();
 		Log.v(TAG, localManifest);
-		return localManifest;*/
+		return localManifest;
 	}
 
 	private void downloadPlatforms() {

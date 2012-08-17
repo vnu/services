@@ -2,6 +2,7 @@ package edu.buffalo.cse.phonelab.services.launcher;
 
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -47,7 +48,8 @@ public class LauncherService extends Service implements ManifestInterface {
 	private LauncherParameters currentLauncherParameters = null;
 	
 	private ScheduledThreadPoolExecutor checkServicesExecutor;
-	private CheckServicesTask checkServicesTask;
+	private ScheduledFuture<Void> checkServicesFuture;
+	private CheckServicesRunnable checkServicesRunnable;
 	
 	private ServiceConnection manifestServiceConnection = new ServiceConnection() {
 		
@@ -67,10 +69,11 @@ public class LauncherService extends Service implements ManifestInterface {
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
 			
-		checkServicesTask = new CheckServicesTask();
+		checkServicesRunnable = new CheckServicesRunnable();
+		checkServicesExecutor = new ScheduledThreadPoolExecutor(1);
 		
-		Intent manifestServiceIntent = new Intent(this, ManifestService.class);
-		bindService(manifestServiceIntent, manifestServiceConnection, Context.BIND_AUTO_CREATE);
+		Intent manifestIntent = new Intent(this, ManifestService.class);
+		bindService(manifestIntent, manifestServiceConnection, Context.BIND_AUTO_CREATE);
 		
 		return START_STICKY;
 	}
@@ -81,9 +84,9 @@ public class LauncherService extends Service implements ManifestInterface {
 			checkServicesExecutor.shutdown();
 		}
 		
-		LauncherParameters finalLauncherParameters = new LauncherParameters();
-		finalLauncherParameters.stoppedServices.addAll(currentLauncherParameters.runningServices);
-		finalLauncherParameters.stoppedServices.addAll(currentLauncherParameters.stoppedServices);
+		LauncherParameters parameters = new LauncherParameters();
+		parameters.stoppedServices.addAll(currentLauncherParameters.runningServices);
+		parameters.stoppedServices.addAll(currentLauncherParameters.stoppedServices);
 		checkServices();
 	}
 	
@@ -112,6 +115,7 @@ public class LauncherService extends Service implements ManifestInterface {
 		}
 	}
 	
+	@SuppressWarnings("unchecked")
 	private void updateParameters(LauncherParameters newLauncherParameters) {
 		
 		if (currentLauncherParameters == null ||
@@ -123,15 +127,14 @@ public class LauncherService extends Service implements ManifestInterface {
 			 */
 			
 			int nextInterval;
-			if (checkServicesExecutor != null) {
+			if (checkServicesFuture != null) {
 				nextInterval = newLauncherParameters.checkInterval;
-				checkServicesExecutor.shutdown();
+				checkServicesFuture.cancel(false);
 			} else {
 				nextInterval = 0;
 			}
 			
-			checkServicesExecutor = new ScheduledThreadPoolExecutor(1);
-			checkServicesExecutor.scheduleAtFixedRate(checkServicesTask, nextInterval, newLauncherParameters.checkInterval, TimeUnit.SECONDS);
+			checkServicesFuture = (ScheduledFuture<Void>) checkServicesExecutor.scheduleAtFixedRate(checkServicesRunnable, nextInterval, newLauncherParameters.checkInterval, TimeUnit.SECONDS);
 			
 			Log.v(TAG, "Updated checkInterval to " + newLauncherParameters.checkInterval + ".");
 		}
@@ -140,11 +143,11 @@ public class LauncherService extends Service implements ManifestInterface {
 		TAG = currentLauncherParameters.logTag;
 	}
 	
-	private class CheckServicesTask implements Runnable {
+	private class CheckServicesRunnable implements Runnable {
 		@Override
 		public void run() {
 			checkServices();
-			Log.v(TAG, "CheckServicesTask ran.");
+			Log.v(TAG, "CheckServicesRunnable ran.");
 		}
 	}
 	

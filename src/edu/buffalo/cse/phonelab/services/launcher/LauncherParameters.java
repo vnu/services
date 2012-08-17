@@ -4,7 +4,9 @@ import java.util.HashSet;
 
 import org.simpleframework.xml.Element;
 import org.simpleframework.xml.ElementList;
+import org.simpleframework.xml.Root;
 
+@Root(name="LauncherParameters")
 public class LauncherParameters {
 	@Element
 	public String logTag;
@@ -20,6 +22,7 @@ public class LauncherParameters {
 	
 	public LauncherParameters() {
 		logTag = "LauncherService";
+		checkInterval = 600;
 		runningServices = new HashSet<String>();
 		stoppedServices = new HashSet<String>();
 	}
@@ -35,6 +38,7 @@ public class LauncherParameters {
 		LauncherParameters lhs = (LauncherParameters) o;
 		
 		return logTag != null && logTag.equals(lhs.logTag) &&
+				checkInterval != null && checkInterval.equals(lhs.checkInterval) &&
 				runningServices != null && runningServices.equals(lhs.runningServices) &&
 				stoppedServices != null && stoppedServices.equals(lhs.stoppedServices);
 	}

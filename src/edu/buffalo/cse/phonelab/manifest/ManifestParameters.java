@@ -6,7 +6,7 @@ import java.util.Locale;
 import org.simpleframework.xml.Element;
 import org.simpleframework.xml.Root;
 
-@Root
+@Root(name="edu.buffalo.cse.phonelab.manifest.ManifestService")
 public class ManifestParameters {
 	
 	@Element
@@ -27,8 +27,8 @@ public class ManifestParameters {
 	
 	public ManifestParameters() {
 		logTag = "ManifestParameters";
-		updateRate = 30;
-		manifestURL = "http://blue.cse.buffalo.edu/manifest/";
+		updateRate = 600;
+		manifestURL = "http://blue.cse.buffalo.edu/phonelab/";
 		compareFiles = false;
 		compareNodes = false;
 	}

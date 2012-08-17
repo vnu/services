@@ -5,16 +5,29 @@
     <updateRate>30</updateRate>
     <compareFiles>False</compareFiles>
     <compareNodes>False</compareNodes>
-    <manifestURL>http://blue.cse.buffalo.edu/manifest/</manifestURL>
+    <manifestURL>http://blue.cse.buffalo.edu/phonelab/</manifestURL>
   </edu.buffalo.cse.phonelab.manifest.ManifestService>
   <edu.buffalo.cse.phonelab.launcher.LauncherService>
     <logTag>LauncherService</logTag>
     <checkInterval>30</checkInterval>
-    <phoneLabRunningServices>
+    <runningServices>
       <string>edu.buffalo.cse.phonelab.manifest.ManifestService</string>
-    </phoneLabRunningServices>
-    <phoneLabStoppedServices>
+      <string>edu.buffalo.cse.phonelab.platform.PlatformService</string>
+    </runningServices>
+    <stoppedServices>
       <string>edu.buffalo.cse.phonelab.Dummy.DummyService</string>
-    </phoneLabStoppedServices>
+    </stoppedServices>
   </edu.buffalo.cse.phonelab.launcher.LauncherService>
+  <edu.buffalo.cse.phonelab.platform.PlatformService>
+    <logTag>PlatformService</logTag>
+    <failedRetryDelay>1200</failedRetryDelay>
+    <modified>2007-01-03 18:05:11.234 EDT</modified>
+    <platforms>
+      <platformImage golden="True">
+        <fingerprint>Android/full_crespo4g/crespo4g:4.0.4/IMM76D/eng.challen.20120814.093729:userdebug/test-keys</fingerprint>
+        <uri>http://blue.cse.buffalo.edu/phonelab/full_crespo4g-ota-eng.challen.zip</uri>
+        <hash>8d71179ac86596f46239e48a5de3aa4e</hash>
+      </platformImage>
+    </platforms>
+  </edu.buffalo.cse.phonelab.platform.PlatformService>
 </manifest>

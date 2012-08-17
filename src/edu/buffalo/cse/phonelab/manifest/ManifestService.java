@@ -2,9 +2,11 @@ package edu.buffalo.cse.phonelab.manifest;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -15,6 +17,8 @@ import java.security.DigestInputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -68,14 +72,14 @@ public class ManifestService extends Service implements ManifestInterface {
 	private Document manifestDocument;
 	
 	private ScheduledThreadPoolExecutor updateManifestExecutor;
-	private UpdateManifestTask updateManifestTask;
+	private UpdateManifestRunnable updateManifestRunnable;
+	private ScheduledFuture<Void> updateManifestFuture;
 	
 	private ManifestParameters currentManifestParameters = null;
 	
 	private File serverManifestFile;
 	private byte[] serverManifestDigest;
 	
-	@SuppressWarnings("unused")
 	private File clientManifestFile;
 	private File newManifestFile;
 	
@@ -97,6 +101,8 @@ public class ManifestService extends Service implements ManifestInterface {
 		serverManifestFile = new File(manifestDir, "server.xml");
 		clientManifestFile = new File(manifestDir, "client.xml");
 		newManifestFile = new File(manifestDir, "new.xml");
+		
+		Log.d(TAG, "-------------- STARTING MANIFEST SERVICE ---------------");
 		
 		assetManager = getApplicationContext().getAssets();
 		
@@ -125,7 +131,8 @@ public class ManifestService extends Service implements ManifestInterface {
 			return START_NOT_STICKY;
 		}
 		
-		updateManifestTask = new UpdateManifestTask();
+		updateManifestRunnable = new UpdateManifestRunnable();
+		updateManifestExecutor = new ScheduledThreadPoolExecutor(1);
 		
 		ManifestParameters newManifestParameters = new ManifestParameters();
 		updateParameters(newManifestParameters);
@@ -151,17 +158,16 @@ public class ManifestService extends Service implements ManifestInterface {
 	
 	@Override
 	public void onDestroy() {
-		if (updateManifestExecutor != null) {
-			updateManifestExecutor.shutdown();
-		}
+		updateManifestExecutor.shutdown();
 		Intent launcherServiceIntent = new Intent(getApplicationContext(), LauncherService.class);
 		this.stopService(launcherServiceIntent);
 	}
 	
-	private class UpdateManifestTask implements Runnable {
+	private class UpdateManifestRunnable implements Runnable {
 		@Override
 		public void run() {
 			try {
+				collectManifest();
 				boolean receivedNewManifest = downloadManifest();
 				if (receivedNewManifest == true ||
 					currentManifestParameters.compareFiles == false) {
@@ -170,6 +176,33 @@ public class ManifestService extends Service implements ManifestInterface {
 			} catch (Exception e) {
 				Log.d(TAG, "reloadManifest() failed " + e.toString());
 			}
+		}
+	}
+	
+	private synchronized boolean collectManifest() {
+		try {
+			BufferedWriter clientManifestWriter = new BufferedWriter(new FileWriter(clientManifestFile));
+			clientManifestWriter.write("<?xml version=\"1.0\" encoding=\"UTF-8\"?>");
+			
+			for (HashMap.Entry<String, ManifestReceiver> entry : receiverHash.entrySet()) {
+				
+				String manifestReceiverName = entry.getKey();
+				ManifestReceiver manifestReceiver = entry.getValue();
+				
+				try {
+					Log.v(TAG, "Collecting manifest from " + manifestReceiverName);
+					String localReceiverUpdate = manifestReceiver.receiver.localUpdate();
+					if (localReceiverUpdate != null) {
+						clientManifestWriter.write(localReceiverUpdate);
+					}
+				} catch (Exception e) {
+					continue;
+				}
+			}
+			clientManifestWriter.close();
+			return true;
+		} catch (IOException e) {
+			return false;
 		}
 	}
 	
@@ -305,7 +338,8 @@ public class ManifestService extends Service implements ManifestInterface {
 		Log.i(TAG, "Received new manifest.");
 	}
 
-	private void updateParameters(ManifestParameters newManifestParameters) {
+	@SuppressWarnings("unchecked")
+	private synchronized void updateParameters(ManifestParameters newManifestParameters) {
 		
 		if (currentManifestParameters == null ||
 			currentManifestParameters.updateRate == null ||
@@ -313,17 +347,11 @@ public class ManifestService extends Service implements ManifestInterface {
 			
 			Log.v(TAG, "Updating update rate.");
 			
-			int nextInterval;
-			if (updateManifestExecutor != null) {
-				updateManifestExecutor.shutdown();
-				nextInterval = newManifestParameters.updateRate;
-			} else {
-				nextInterval = 0;
+			if (updateManifestFuture != null) {
+				updateManifestFuture.cancel(false);
 			}
-			
-			updateManifestExecutor = new ScheduledThreadPoolExecutor(1);
-			updateManifestExecutor.scheduleAtFixedRate(updateManifestTask,
-					nextInterval, newManifestParameters.updateRate, TimeUnit.SECONDS);
+			updateManifestFuture = (ScheduledFuture<Void>) updateManifestExecutor.scheduleAtFixedRate(updateManifestRunnable,
+					newManifestParameters.updateRate, newManifestParameters.updateRate, TimeUnit.SECONDS);
 			
 			Log.v(TAG, "Updated updateRate to " + newManifestParameters.updateRate + ".");
 		}
@@ -336,7 +364,6 @@ public class ManifestService extends Service implements ManifestInterface {
 	
 	@Override
 	public String localUpdate() {
-		// TODO Auto-generated method stub
 		return null;
 	}
 	

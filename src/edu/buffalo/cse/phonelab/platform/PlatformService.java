@@ -1,6 +1,15 @@
 package edu.buffalo.cse.phonelab.platform;
 
+import java.io.BufferedInputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.io.StringWriter;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.ArrayList;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
@@ -22,6 +31,7 @@ import android.net.Uri;
 import android.os.Environment;
 import android.os.IBinder;
 import android.preference.PreferenceManager;
+import android.telephony.SignalStrength;
 import android.util.Log;
 import edu.buffalo.cse.phonelab.manifest.ManifestInterface;
 import edu.buffalo.cse.phonelab.manifest.ManifestService;
@@ -33,18 +43,20 @@ public class PlatformService extends Service implements ManifestInterface {
 	
 	ManifestService manifestService;
 	
-	private PlatformParameters currentPlatformParameters = null;
+	private PlatformParameters currentPlatformParameters;
 	
-	private File platformDirectory;
+	public File platformImageDirectory;
+	public DownloadManager platformImagesDownloadManager;
 	
-	private DownloadManager platformDownloadManager;
-	private SharedPreferences platformSharedPreferences;
-	private DownloadPlatformsTask downloadPlatformsTask;
-	private ScheduledThreadPoolExecutor downloadPlatformsExecutor;
+	private SharedPreferences platformSharedPreferences;	
+	private DownloadPlatformImagesCallable downloadPlatformImagesCallable;
+	private ScheduledFuture<Void> downloadPlatformImagesFuture;
 	
-	private long currentPlatformDownloadID;
-	private String currentPlatformDownloadKey = "PlatformService_currentPlatformDownloadID";
-	private Object currentPlatformDownloadLock = new Object();
+	private ScheduledThreadPoolExecutor downloadPlatformImagesExecutor;
+	
+	private long currentPlatformImageDownloadID;
+	private String currentPlatformImageDownloadKey = "PlatformService_currentPlatformDownloadID";
+	private Object currentPlatformImageDownloadLock = new Object();
 	
 	private ServiceConnection manifestServiceConnection = new ServiceConnection() {
 		
@@ -65,39 +77,81 @@ public class PlatformService extends Service implements ManifestInterface {
 
 		@Override
 		public void onReceive(Context arg0, Intent arg1) {
-			synchronized(currentPlatformDownloadLock) {
-				if (currentPlatformDownloadID == 0) {
+			synchronized(currentPlatformImageDownloadLock) {
+				
+				DownloadManager.Query query = new DownloadManager.Query();
+				long[] downloadIDs = getDownloadIDs();
+				if (downloadIDs.length == 0) {
 					return;
 				}
-				DownloadManager.Query platformDownloadQuery = new DownloadManager.Query();
-				platformDownloadQuery.setFilterById(currentPlatformDownloadID);
-				Cursor platformDownloadCursor = platformDownloadManager.query(platformDownloadQuery);
-				if (!(platformDownloadCursor.moveToFirst())) {
+				query.setFilterById(downloadIDs);
+				Cursor cursor = platformImagesDownloadManager.query(query);
+				
+				if (!(cursor.moveToFirst())) {
 					return;
 				}
+				do {
+					long downloadID = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_ID));
+					PlatformImage platform = getPlatformByDownloadID(downloadID);
+					assert platform != null;
+					
+					int status = cursor.getInt(cursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
+						
+					if (status == DownloadManager.STATUS_SUCCESSFUL) {
+						
+						platform.downloadID = null;
+						platform.available = true;
+						Log.i(TAG, "Download of " + platform.uri + " succeeded.");
+						
+						try {
+							platform.valid = true;
+							String fileFingerprint = platform.getFileFingerprint();
+							if (!(platform.fingerprint.equals(fileFingerprint))) {
+								Log.i(TAG, "Update fails fingerprint test: " + platform.fingerprint + " != " + fileFingerprint);
+								platform.valid = false;
+							} else {
+								Log.i(TAG, "Update passes fingerprint test.");
+							}
+							
+							String fileHash = platform.getFileHash();
+							if (!(platform.hash.equals(fileHash))) {
+								Log.i(TAG, "Update fails hash test: " + platform.hash + " != " + fileHash);
+								platform.valid = false;
+							} else {
+								Log.i(TAG, "Update passes hash test");
+							}
+							
+							if (platform.valid) {
+								Log.i(TAG, "Update passes fingerprint and hash tests.");
+							}
+						} catch (Exception e) {
+							Log.i(TAG, "Fingerprint or hash caused exception.");
+							platform.valid = false;
+						}
+							
+						downloadPlatformImagesFuture = downloadPlatformImagesExecutor.schedule(downloadPlatformImagesCallable, 0, TimeUnit.SECONDS);
+						
+					} else if (status == DownloadManager.STATUS_FAILED) {
+						platform.downloadID = null;
+						platform.available = false;
+						downloadPlatformImagesFuture = downloadPlatformImagesExecutor.schedule(downloadPlatformImagesCallable, currentPlatformParameters.failedRetryDelay, TimeUnit.SECONDS);
+						Log.d(TAG, "Download of " + platform.uri + " failed. Retrying in " + currentPlatformParameters.failedRetryDelay + " seconds.");
+					} else if (status == DownloadManager.STATUS_RUNNING) {
+						platform.available = true;
+					}
+				} while (cursor.moveToNext());
 				
-				int platformDownloadStatus = platformDownloadCursor.getInt(platformDownloadCursor.getColumnIndex(DownloadManager.COLUMN_STATUS));
-				String platformDownloadURI = platformDownloadCursor.getString(platformDownloadCursor.getColumnIndex(DownloadManager.COLUMN_URI));
-				
-				if (platformDownloadStatus == DownloadManager.STATUS_SUCCESSFUL) {
-					currentPlatformDownloadID = 0;
-					downloadPlatformsExecutor.execute(downloadPlatformsTask);
-					Log.i(TAG, "Download of " + platformDownloadURI + " succeeded.");
-				} else if (platformDownloadStatus == DownloadManager.STATUS_FAILED) {
-					currentPlatformDownloadID = 0;
-					downloadPlatformsExecutor.schedule(downloadPlatformsTask, currentPlatformParameters.failedRetryDelay, TimeUnit.SECONDS);
-					Log.d(TAG, "Download of " + platformDownloadURI + " failed. Retrying in " + currentPlatformParameters.failedRetryDelay + " seconds.");
-				}
-				platformDownloadCursor.close();
+				cursor.close();
 			}
 		}
 		
 	};
 	
-	private class DownloadPlatformsTask implements Runnable {
-		@Override
-		public void run() {
+	private class DownloadPlatformImagesCallable implements Callable<Void> {
+		public Void call() {
 			downloadPlatforms();
+			downloadPlatformImagesFuture = null;
+			return null;
 		}
 	}
 
@@ -106,15 +160,16 @@ public class PlatformService extends Service implements ManifestInterface {
 		
 		File externalStorageRoot = this.getExternalFilesDir(null);
 		Log.v(TAG, externalStorageRoot.toString());
-		platformDirectory = new File(externalStorageRoot, "/platform/");
+		platformImageDirectory = new File(externalStorageRoot, "/platform/");
 		checkStorage();
 		
-		platformDownloadManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
+		platformImagesDownloadManager = (DownloadManager) getSystemService(Context.DOWNLOAD_SERVICE);
 		platformSharedPreferences = PreferenceManager.getDefaultSharedPreferences(this);
-		currentPlatformDownloadID = platformSharedPreferences.getLong(currentPlatformDownloadKey, 0);
+		currentPlatformImageDownloadID = platformSharedPreferences.getLong(currentPlatformImageDownloadKey, 0);
+		currentPlatformParameters = new PlatformParameters();
 		
-		downloadPlatformsExecutor = new ScheduledThreadPoolExecutor(1);
-		downloadPlatformsTask = new DownloadPlatformsTask();
+		downloadPlatformImagesExecutor = new ScheduledThreadPoolExecutor(1);
+		downloadPlatformImagesCallable = new DownloadPlatformImagesCallable();
 		
 		IntentFilter platformDownloadFilter = new IntentFilter(DownloadManager.ACTION_DOWNLOAD_COMPLETE);
 		registerReceiver(platformDownloadReceiver, platformDownloadFilter);
@@ -128,7 +183,7 @@ public class PlatformService extends Service implements ManifestInterface {
 	@Override
 	public void onDestroy() {
 		Editor editor = platformSharedPreferences.edit();
-		editor.putLong(currentPlatformDownloadKey, currentPlatformDownloadID);
+		editor.putLong(currentPlatformImageDownloadKey, currentPlatformImageDownloadID);
 		editor.commit();
 	}
 	
@@ -151,6 +206,8 @@ public class PlatformService extends Service implements ManifestInterface {
 		if (currentPlatformParameters == null ||
 			(!(currentPlatformParameters.equals(newPlatformParameters)))) {
 			Log.i(TAG, "Platform parameters have changed.");
+			Log.v(TAG, currentPlatformParameters.toString());
+			Log.v(TAG, newPlatformParameters.toString());
 			updateParameters(newPlatformParameters);
 		} else {
 			Log.v(TAG, "Platform parameters are unchanged.");
@@ -158,18 +215,58 @@ public class PlatformService extends Service implements ManifestInterface {
 	}
 	
 	private void updateParameters(PlatformParameters newPlatformParameters) {
+		TAG = newPlatformParameters.logTag;
+		
+		/*
+		 * 16 Aug 2012 : GWA : We save state that the manifest does not, so avoid losing it here.
+		 */
+		
+		for (PlatformImage platform : newPlatformParameters.platforms) {
+			if (!(currentPlatformParameters.platforms.contains(platform))) {
+				currentPlatformParameters.platforms.add(platform);
+			}
+		}
+		
+		/*
+		 * 16 Aug 2012 : GWA : Should we really remove images this aggressively?
+		 */
+		
+		for (PlatformImage platform : currentPlatformParameters.platforms) {
+			if (!(newPlatformParameters.platforms.contains(platform))) {
+				platform.removeFile();
+			}
+		}
+		
+		Log.v(TAG, newPlatformParameters.platforms.size() + " " + currentPlatformParameters.platforms.size());
+		newPlatformParameters.platforms = new ArrayList<PlatformImage>(currentPlatformParameters.platforms);
+		Log.v(TAG, newPlatformParameters.platforms.size() + " " + currentPlatformParameters.platforms.size());
 		currentPlatformParameters = newPlatformParameters;
-		TAG = currentPlatformParameters.logTag;
-		downloadPlatformsExecutor.execute(downloadPlatformsTask);
+		Log.v(TAG, newPlatformParameters.platforms.size() + " " + currentPlatformParameters.platforms.size());
+		
+		if (downloadPlatformImagesFuture != null) {
+			downloadPlatformImagesFuture.cancel(false);
+		}
+		downloadPlatformImagesFuture = downloadPlatformImagesExecutor.schedule(downloadPlatformImagesCallable, 0, TimeUnit.SECONDS);
 	}
 
 	@Override
 	public String localUpdate() {
 		return null;
+		/*
+		Serializer serializer = new Persister();
+		StringWriter writer = new StringWriter();
+		try {
+			serializer.write(currentPlatformParameters, writer);
+		} catch (Exception e) {
+			Log.d(TAG, "Unable to generate local manifest: " + e);
+		}
+		String localManifest = writer.toString();
+		Log.v(TAG, localManifest);
+		return localManifest;*/
 	}
 
 	private void downloadPlatforms() {
-		synchronized(currentPlatformDownloadLock) {
+		synchronized(currentPlatformImageDownloadLock) {
 			assert currentPlatformParameters != null : currentPlatformParameters;
 			
 			if (!(checkStorage())) {
@@ -177,14 +274,15 @@ public class PlatformService extends Service implements ManifestInterface {
 				return;
 			}
 			
-			if (currentPlatformDownloadID != 0) {
+			if (currentPlatformImageDownloadID != 0) {
 				Log.w(TAG, "Platform download in progress. Not downloading.");
 			}
 			
-			PlatformDescription goldenPlatform = currentPlatformParameters.getGoldenPlatform();
+			PlatformImage goldenPlatform = getGoldenPlatform();
+			
 			if (goldenPlatform != null) {
-				if (retrievePlatform(goldenPlatform) == null) {
-					Log.i(TAG, "Golden platform missing. Initiating download.");
+				if (!(goldenPlatform.valid)) {
+					Log.i(TAG, "Golden platform missing or invalid. Initiating download.");
 					downloadPlatform(goldenPlatform);
 					return;
 				} else {
@@ -194,44 +292,33 @@ public class PlatformService extends Service implements ManifestInterface {
 				Log.w(TAG, "Manifest missing golden platform.");
 			}
 		}
-	}
-	
-	private File retrievePlatform(PlatformDescription platform) {
+	}	
 		
-		File platformFile = new File(platformDirectory, platform.filename);
-		if (!(platformFile.exists())) {
-			return null;
-		}		
-		if (platformFile.length() != platform.size) {
-			return null;
+	private boolean downloadPlatform(PlatformImage platform) {
+		
+		assert platform.downloadID == null : platform;
+		
+		File tempFileName;
+		
+		try {
+			platform.file = File.createTempFile("image", ".zip", platformImageDirectory);
+			tempFileName = new File(platform.file.getPath());
+			platform.file.delete();
+			platform.file = tempFileName;
+		} catch (IOException e) {
+			return false;
 		}
 		
-		/*
-		 * 15 Aug 2012 : GWA : TODO : Add md5 hash checking.
-		 */
+		DownloadManager.Request request = new DownloadManager.Request(Uri.parse(platform.uri));
 		
-		return platformFile;
-	}
-	
+		request.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI);
+		request.setDestinationUri(Uri.fromFile(platform.file));
+		request.setNotificationVisibility(DownloadManager.Request.VISIBILITY_HIDDEN);
+		request.setVisibleInDownloadsUi(false);
 		
-	@SuppressWarnings("deprecation")
-	private boolean downloadPlatform(PlatformDescription platform) {
-		
-		assert retrievePlatform(platform) == null : platform;
-		assert currentPlatformDownloadID == 0 : currentPlatformDownloadID;
-		
-		File platformFile = new File(platformDirectory, platform.filename);
-		
-		DownloadManager.Request platformDownloadRequest = new DownloadManager.Request(Uri.parse(platform.url));
-		
-		platformDownloadRequest.setAllowedNetworkTypes(DownloadManager.Request.NETWORK_WIFI);
-		platformDownloadRequest.setDestinationUri(Uri.fromFile(platformFile));
-		platformDownloadRequest.setShowRunningNotification(false);
-		platformDownloadRequest.setVisibleInDownloadsUi(false);
-		
-		currentPlatformDownloadID = platformDownloadManager.enqueue(platformDownloadRequest);
-		
-		Log.i(TAG, "Initiating download from " + platform.url + " to " + platformFile + ".");
+		platform.downloadID = platformImagesDownloadManager.enqueue(request);
+
+		Log.i(TAG, "Initiating download from " + platform.uri + " to " + platform.file + ".");
 		
 		return true;
 	}
@@ -243,14 +330,54 @@ public class PlatformService extends Service implements ManifestInterface {
 			Log.i(TAG, "External storage not available.");
 			return false;
 		}
-		if (!(platformDirectory.exists())) {
-			if (platformDirectory.mkdirs() != true) {
-				Log.d(TAG, "Unable to create platform directory " + platformDirectory);
+		
+		if (!(platformImageDirectory.exists())) {
+			if (platformImageDirectory.mkdirs() != true) {
+				Log.d(TAG, "Unable to create platform directory " + platformImageDirectory);
 				return false;
 			} else {
-				Log.v(TAG, "Created platform directory " + platformDirectory);
+				Log.v(TAG, "Created platform directory " + platformImageDirectory);
 			}
 		}
+		
 		return true;
 	}
+	
+	public PlatformImage getGoldenPlatform() {
+		for (PlatformImage platform : currentPlatformParameters.platforms) {
+			if (platform.golden) {
+				return platform;
+			}
+		}
+		return null;
+	}
+	
+	public long[] getDownloadIDs() {
+		
+		ArrayList<Long> downloadIDsArray = new ArrayList<Long>();
+		for (PlatformImage platform : currentPlatformParameters.platforms) {
+			if (platform.downloadID != null) {
+				downloadIDsArray.add(platform.downloadID);
+			}
+		}
+		
+		long[] downloadIDs = new long[downloadIDsArray.size()];
+		for (int i = 0; i < downloadIDsArray.size(); i++) {
+			downloadIDs[i] = downloadIDsArray.get(i);
+		}
+		
+		return downloadIDs;
+	}
+	
+	public PlatformImage getPlatformByDownloadID(long downloadID) {
+		for (PlatformImage platform : currentPlatformParameters.platforms) {
+			if (platform.downloadID != null &&
+					platform.downloadID == downloadID) {
+				return platform;
+			}
+		}
+		return null;
+	}
+	
+	
 }

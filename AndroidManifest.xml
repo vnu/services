@@ -22,11 +22,13 @@
         </receiver>
         
         <service android:enabled="true" android:name=".manifest.ManifestService">
-            <intent-filter><action android:name="edu.buffalo.cse.phonelab.manifest.ManifestService"></action></intent-filter>
+            <intent-filter><action android:name="edu.buffalo.cse.phonelab.services.manifest.ManifestService"></action></intent-filter>
         </service>
-        <service android:enabled="true" android:name=".launcher.LauncherService" />
+        <service android:enabled="true" android:name=".launcher.LauncherService">
+            <intent-filter><action android:name="edu.buffalo.cse.phonelab.services.launcher.LauncherService"></action></intent-filter>
+        </service>
         <service android:enabled="true" android:name=".platform.PlatformService">
-            <intent-filter><action android:name="edu.buffalo.cse.phonelab.platform.PlatformService"></action></intent-filter>
+            <intent-filter><action android:name="edu.buffalo.cse.phonelab.services.platform.PlatformService"></action></intent-filter>
         </service>
     </application>
 </manifest>

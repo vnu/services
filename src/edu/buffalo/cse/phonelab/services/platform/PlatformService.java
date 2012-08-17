@@ -1,4 +1,4 @@
-package edu.buffalo.cse.phonelab.platform;
+package edu.buffalo.cse.phonelab.services.platform;
 
 import java.io.BufferedInputStream;
 import java.io.File;
@@ -33,9 +33,9 @@ import android.os.IBinder;
 import android.preference.PreferenceManager;
 import android.telephony.SignalStrength;
 import android.util.Log;
-import edu.buffalo.cse.phonelab.manifest.ManifestInterface;
-import edu.buffalo.cse.phonelab.manifest.ManifestService;
-import edu.buffalo.cse.phonelab.manifest.ManifestService.ManifestBinder;
+import edu.buffalo.cse.phonelab.services.manifest.ManifestInterface;
+import edu.buffalo.cse.phonelab.services.manifest.ManifestService;
+import edu.buffalo.cse.phonelab.services.manifest.ManifestService.ManifestBinder;
 
 public class PlatformService extends Service implements ManifestInterface {
 	

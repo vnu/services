@@ -1,4 +1,4 @@
-package edu.buffalo.cse.phonelab.launcher;
+package edu.buffalo.cse.phonelab.services.launcher;
 
 import java.util.HashSet;
 import java.util.Iterator;
@@ -17,9 +17,9 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.IBinder;
 import android.util.Log;
-import edu.buffalo.cse.phonelab.manifest.ManifestInterface;
-import edu.buffalo.cse.phonelab.manifest.ManifestService;
-import edu.buffalo.cse.phonelab.manifest.ManifestService.ManifestBinder;
+import edu.buffalo.cse.phonelab.services.manifest.ManifestInterface;
+import edu.buffalo.cse.phonelab.services.manifest.ManifestService;
+import edu.buffalo.cse.phonelab.services.manifest.ManifestService.ManifestBinder;
 
 /*
  * 15 Aug 2012 : GWA : Example of a simple PhoneLab service.

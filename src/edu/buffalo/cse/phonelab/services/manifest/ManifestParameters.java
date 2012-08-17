@@ -1,4 +1,4 @@
-package edu.buffalo.cse.phonelab.manifest;
+package edu.buffalo.cse.phonelab.services.manifest;
 
 import java.util.Formatter;
 import java.util.Locale;

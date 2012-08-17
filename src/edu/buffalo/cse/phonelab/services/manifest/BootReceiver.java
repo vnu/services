@@ -1,9 +1,9 @@
-package edu.buffalo.cse.phonelab.manifest;
+package edu.buffalo.cse.phonelab.services.manifest;
 
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
-import edu.buffalo.cse.phonelab.manifest.ManifestService;
+import edu.buffalo.cse.phonelab.services.manifest.ManifestService;
 
 public class BootReceiver extends BroadcastReceiver {
 

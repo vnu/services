@@ -1,4 +1,4 @@
-package edu.buffalo.cse.phonelab.platform;
+package edu.buffalo.cse.phonelab.services.platform;
 
 import java.util.ArrayList;
 import java.util.Date;

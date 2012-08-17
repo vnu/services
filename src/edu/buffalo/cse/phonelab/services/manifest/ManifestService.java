@@ -1,4 +1,4 @@
-package edu.buffalo.cse.phonelab.manifest;
+package edu.buffalo.cse.phonelab.services.manifest;
 
 import java.io.BufferedInputStream;
 import java.io.BufferedOutputStream;
@@ -48,11 +48,11 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.telephony.TelephonyManager;
 import android.util.Log;
-import edu.buffalo.cse.phonelab.launcher.LauncherService;
+import edu.buffalo.cse.phonelab.services.launcher.LauncherService;
 
 public class ManifestService extends Service implements ManifestInterface {
 	
-	private String TAG = "ManifestService";
+	private String TAG = "PhoneLab.ManifestService";
 	
 	private final IBinder manifestBinder = new ManifestBinder();
 	
@@ -102,7 +102,7 @@ public class ManifestService extends Service implements ManifestInterface {
 		clientManifestFile = new File(manifestDir, "client.xml");
 		newManifestFile = new File(manifestDir, "new.xml");
 		
-		Log.d(TAG, "-------------- STARTING MANIFEST SERVICE ---------------");
+		Log.v(TAG, "-------------- STARTING MANIFEST SERVICE ---------------");
 		
 		assetManager = getApplicationContext().getAssets();
 		
@@ -158,6 +158,8 @@ public class ManifestService extends Service implements ManifestInterface {
 	
 	@Override
 	public void onDestroy() {
+		Log.v(TAG, "-------------- STOPPING MANIFEST SERVICE ---------------");
+		
 		updateManifestExecutor.shutdown();
 		Intent launcherServiceIntent = new Intent(getApplicationContext(), LauncherService.class);
 		this.stopService(launcherServiceIntent);

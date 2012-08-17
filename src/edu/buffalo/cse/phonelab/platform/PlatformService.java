@@ -206,8 +206,6 @@ public class PlatformService extends Service implements ManifestInterface {
 		if (currentPlatformParameters == null ||
 			(!(currentPlatformParameters.equals(newPlatformParameters)))) {
 			Log.i(TAG, "Platform parameters have changed.");
-			Log.v(TAG, currentPlatformParameters.toString());
-			Log.v(TAG, newPlatformParameters.toString());
 			updateParameters(newPlatformParameters);
 		} else {
 			Log.v(TAG, "Platform parameters are unchanged.");
@@ -237,11 +235,8 @@ public class PlatformService extends Service implements ManifestInterface {
 			}
 		}
 		
-		Log.v(TAG, newPlatformParameters.platforms.size() + " " + currentPlatformParameters.platforms.size());
 		newPlatformParameters.platforms = new ArrayList<PlatformImage>(currentPlatformParameters.platforms);
-		Log.v(TAG, newPlatformParameters.platforms.size() + " " + currentPlatformParameters.platforms.size());
 		currentPlatformParameters = newPlatformParameters;
-		Log.v(TAG, newPlatformParameters.platforms.size() + " " + currentPlatformParameters.platforms.size());
 		
 		if (downloadPlatformImagesFuture != null) {
 			downloadPlatformImagesFuture.cancel(false);

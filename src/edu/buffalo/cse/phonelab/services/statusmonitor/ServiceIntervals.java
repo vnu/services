@@ -2,8 +2,12 @@ package edu.buffalo.cse.phonelab.services.statusmonitor;
 
 import java.util.ArrayList;
 
+import org.simpleframework.xml.Element;
 import org.simpleframework.xml.ElementList;
 import org.simpleframework.xml.ElementListUnion;
+
+import edu.buffalo.cse.phonelab.services.platform.PlatformImage;
+import edu.buffalo.cse.phonelab.services.platform.PlatformParameters;
 
 public class ServiceIntervals {
 	
@@ -15,6 +19,27 @@ public class ServiceIntervals {
 	
 	public ServiceIntervals(){
 		serviceIntervals = new ArrayList<Intervals>();
+	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) {
+			return true;
+		}
+		if (!(o instanceof ServiceIntervals)) {
+			return false;
+		}
+		ServiceIntervals lhs = (ServiceIntervals) o;
+		
+		for (Intervals interval : serviceIntervals) {
+			if (!(lhs.serviceIntervals.contains(interval))) {
+				return false;
+				}			
+		}
+	
+		return logTag.equals(lhs.logTag) &&
+				failedRetryDelay.equals(lhs.failedRetryDelay) &&
+				platforms.size() == lhs.platforms.size();
 	}
 
 }
@@ -39,13 +64,60 @@ class Intervals {
 }
 class ActiveLocation extends Intervals{
 	
+	@Element
+	public Integer value;
+	
+	@Element
+	public String units;
+	
+	@Element
+	public Boolean wakelock;
+	
 	public ActiveLocation(){
 		
 	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) {
+			return true;
+		}
+		if (!(o instanceof ActiveLocation)) {
+			return false;
+		}
+		ActiveLocation lhs = (ActiveLocation) o;
+		
+		return value.equals(lhs.value) &&
+				units.equals(lhs.units) &&
+				wakelock.equals(lhs.wakelock);
+	}
 }
 class PassiveLocation extends Intervals{
+	@Element
+	public Integer value;
+	
+	@Element
+	public String units;
+	
+	@Element
+	public Boolean wakelock;
 	
 	public PassiveLocation(){
 		
+	}
+	
+	@Override
+	public boolean equals(Object o) {
+		if (this == o) {
+			return true;
+		}
+		if (!(o instanceof PassiveLocation)) {
+			return false;
+		}
+		PassiveLocation lhs = (PassiveLocation) o;
+		
+		return value.equals(lhs.value) &&
+				units.equals(lhs.units) &&
+				wakelock.equals(lhs.wakelock);
 	}
 }

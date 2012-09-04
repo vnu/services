@@ -24,30 +24,15 @@ public class StatusMonitorService extends Service implements ManifestInterface {
 	ManifestService manifestService;
 	private StatusMonitorParameters currentStatusMonitorParameters = null;
 	
-	private ScheduledThreadPoolExecutor checkServicesExecutor;
+	private ScheduledThreadPoolExecutor statusServicesExecutor;
 	private ScheduledFuture<Void> checkServicesFuture;
-	private CheckServicesRunnable checkServicesRunnable;
-	
-   private ServiceConnection manifestServiceConnection = new ServiceConnection() {
-		
-		@Override
-		public void onServiceConnected(ComponentName className, IBinder service) {
-			ManifestBinder binder = (ManifestBinder) service;
-			manifestService = binder.getService();
-			manifestService.receiveManifestUpdates(StatusMonitorService.this);
-		}
-		
-		@Override
-		public void onServiceDisconnected(ComponentName arg0) {
-			StatusMonitorService.this.stopSelf();
-		}
-	};
+	private StatusServicesRunnable statusServicesRunnable;  
 	
 	@Override
 	public int onStartCommand(Intent intent, int flags, int startId) {
 			
-		checkServicesRunnable = new CheckServicesRunnable();
-		checkServicesExecutor = new ScheduledThreadPoolExecutor(1);
+		statusServicesRunnable = new StatusServicesRunnable();
+		statusServicesExecutor = new ScheduledThreadPoolExecutor(1);
 		
 		Intent manifestIntent = new Intent(this, ManifestService.class);
 		bindService(manifestIntent, manifestServiceConnection, Context.BIND_AUTO_CREATE);
@@ -55,7 +40,22 @@ public class StatusMonitorService extends Service implements ManifestInterface {
 		return START_STICKY;
 	}
 	
-	private class CheckServicesRunnable implements Runnable {
+	 private ServiceConnection manifestServiceConnection = new ServiceConnection() {
+			
+			@Override
+			public void onServiceConnected(ComponentName className, IBinder service) {
+				ManifestBinder binder = (ManifestBinder) service;
+				manifestService = binder.getService();
+				manifestService.receiveManifestUpdates(StatusMonitorService.this);
+			}
+			
+			@Override
+			public void onServiceDisconnected(ComponentName arg0) {
+				StatusMonitorService.this.stopSelf();
+			}
+		};
+	
+	private class StatusServicesRunnable implements Runnable {
 		@Override
 		public void run() {
 			//checkServices();

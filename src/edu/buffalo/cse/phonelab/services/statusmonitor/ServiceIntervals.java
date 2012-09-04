@@ -34,7 +34,8 @@ public class ServiceIntervals {
 		for (Intervals interval : serviceIntervals) {
 			if (!(lhs.serviceIntervals.contains(interval))) {
 				return false;
-				}			
+			}
+			
 		}
 	
 		return logTag.equals(lhs.logTag) &&

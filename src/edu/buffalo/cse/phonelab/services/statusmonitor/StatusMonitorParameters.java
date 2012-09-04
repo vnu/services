@@ -32,9 +32,7 @@ public class StatusMonitorParameters {
 		StatusMonitorParameters lhs = (StatusMonitorParameters) o;
 		
 		return logTag != null && logTag.equals(lhs.logTag) &&
-				checkInterval != null && checkInterval.equals(lhs.checkInterval) &&
-				runningServices != null && runningServices.equals(lhs.runningServices) &&
-				stoppedServices != null && stoppedServices.equals(lhs.stoppedServices);
+				checkInterval != null && checkInterval.equals(lhs.checkInterval);
 	}
 
 }

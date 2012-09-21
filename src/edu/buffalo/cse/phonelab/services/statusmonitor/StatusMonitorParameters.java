@@ -2,8 +2,6 @@ package edu.buffalo.cse.phonelab.services.statusmonitor;
 
 import org.simpleframework.xml.Element;
 
-import edu.buffalo.cse.phonelab.services.launcher.LauncherParameters;
-
 public class StatusMonitorParameters {
 	
 	@Element

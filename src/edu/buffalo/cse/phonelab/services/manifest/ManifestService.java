@@ -47,6 +47,7 @@ import android.os.IBinder;
 import android.telephony.TelephonyManager;
 import android.util.Log;
 import edu.buffalo.cse.phonelab.services.launcher.LauncherService;
+import edu.buffalo.cse.phonelab.services.statusmonitor.StatusMonitorService;
 
 public class ManifestService extends Service implements ManifestInterface {
 	
@@ -132,6 +133,9 @@ public class ManifestService extends Service implements ManifestInterface {
 		
 		Intent launcherServiceIntent = new Intent(getApplicationContext(), LauncherService.class);
 		this.startService(launcherServiceIntent);
+		
+		Intent statusmonitorServiceIntent = new Intent(getApplicationContext(), StatusMonitorService.class);
+		this.startService(statusmonitorServiceIntent);
 		
 		Log.i(TAG, "Started launcher service. Manifest service started.");
 		return START_STICKY;
